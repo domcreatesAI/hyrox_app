@@ -246,7 +246,7 @@ input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--accent);
 @keyframes slide { from { transform: translateX(24px); opacity: 0.6; } }
 
 /* Toasts */
-.toasts { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; z-index: 100; max-width: min(420px, calc(100% - 32px)); }
+.toasts { position: fixed; top: 16px; right: 20px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; z-index: 100; max-width: min(420px, calc(100% - 32px)); }
 .toast { padding: 8px 12px; border-radius: 8px; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 500; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18); cursor: pointer; animation: fade 0.15s ease-out; }
 .toast-ok { border-left: 4px solid var(--ok); }
 .toast-warn { border-left: 4px solid var(--warn); }
@@ -285,7 +285,7 @@ input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--accent);
   .drawer, .drawer-sm { width: 100%; }
   .race-item { flex-direction: column; align-items: flex-start; }
   .race-item-meta { justify-content: flex-start; }
-  .toasts { bottom: 84px; right: 16px; left: 16px; align-items: stretch; max-width: none; }
+  .toasts { top: auto; bottom: 84px; right: 16px; left: 16px; align-items: stretch; max-width: none; }
   input:not([type='checkbox']), select, textarea { font-size: 16px; }
 }
 
@@ -299,3 +299,25 @@ input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--accent);
   .badge { border: 1px solid #999; background: none !important; color: #000 !important; }
   .table td, .table th { padding: 6px 8px; }
 }
+
+/* Messages */
+.drawer-top { z-index: 60; }
+.template-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.pill:hover { background: var(--surface-2); }
+.pill-on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.checks-col { flex-direction: column; gap: 8px; margin-top: 0; }
+.normal { font-weight: 400; text-transform: none; letter-spacing: 0; }
+.msg-card textarea { width: 100%; margin: 8px 0; }
+.msg-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.msg-done textarea { opacity: 0.7; }
+.msg-actions .btn { height: 32px; padding: 0 12px; }
+.placeholder-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0; }
+.placeholder-chips button { border: 1px dashed var(--border); background: var(--surface-2); color: var(--text); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 6px; border-radius: 6px; cursor: pointer; }
+.placeholder-chips button:hover { border-style: solid; }
+.template-edit { border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.template-edit + .template-edit { margin-top: 10px; }
+.template-edit textarea { width: 100%; }
+.template-edit-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.template-edit-head input { flex: 1; min-width: 180px; font-weight: 600; }
+.msg-log { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }

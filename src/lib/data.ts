@@ -19,6 +19,8 @@ export function newBooking(s: Settings, eventId = '', raceDate = ''): Booking {
     eventId,
     raceDate: raceDate || todayISO(),
     startTime: '',
+    meetTime: '',
+    meetPoint: '',
     wave: '',
     division: 'Singles Open',
     packageId: s.packages.find((p) => !p.isAddOn && !p.archived)?.id ?? '',
@@ -76,7 +78,11 @@ export async function syncBookingToCalendar(id: string, settings?: Settings): Pr
 
 /** Save a booking and, if Google is connected and auto-sync is on, push it to the calendar. */
 export async function saveBooking(b: Booking): Promise<SyncResult> {
-  await db.bookings.put({ ...b, updatedAt: Date.now() });
+  // The message log is only written by logMessage(); keep the stored copy so an open editor can't erase entries.
+  await db.transaction('rw', db.bookings, async () => {
+    const stored = await db.bookings.get(b.id);
+    await db.bookings.put({ ...b, messageLog: stored?.messageLog ?? b.messageLog, updatedAt: Date.now() });
+  });
   const s = await getSettings();
   if (s.autoSyncCalendar && s.googleClientId && hasValidToken()) {
     return syncBookingToCalendar(b.id, s);
@@ -119,4 +125,19 @@ export async function syncAllToCalendar(onProgress?: (done: number, total: numbe
     onProgress?.(i + 1, all.length);
   }
   return { synced, failed };
+}
+
+/** Record that a message was copied/sent, without marking the calendar entry as stale. */
+export async function logMessage(bookingId: string, templateId: string, templateName: string): Promise<void> {
+  await db.transaction('rw', db.bookings, async () => {
+    const b = await db.bookings.get(bookingId);
+    if (!b) return;
+    const now = Date.now();
+    const wasInSync = !!b.calendarEventId && !needsCalendarSync(b);
+    await db.bookings.update(bookingId, {
+      messageLog: [...(b.messageLog ?? []), { templateId, templateName, at: now }].slice(-30),
+      updatedAt: now,
+      ...(wasInSync ? { calendarSyncedAt: now } : {})
+    });
+  });
 }

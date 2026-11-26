@@ -5,7 +5,8 @@ import { EventEditor } from '../components/EventEditor';
 import { useToast } from '../components/Toast';
 import { Badge, Empty, PageHeader, StatusBadge } from '../components/ui';
 import { db } from '../db';
-import { balanceDue, packageLabel } from '../lib/calendar';
+import { balanceDue, meetTimeFor, packageLabel } from '../lib/calendar';
+import { useMessageComposer } from '../components/MessageComposer';
 import { needsCalendarSync, saveBooking, syncBookingToCalendar } from '../lib/data';
 import { addDays, daysBetween, formatDate, formatDateRange, money, relativeDay, plural } from '../lib/format';
 import { getAccessToken } from '../lib/google';
@@ -20,6 +21,7 @@ export function RaceDetail() {
   const settings = useSettings();
   const connected = useGoogleConnected();
   const openEditor = useBookingEditor();
+  const openComposer = useMessageComposer();
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -90,7 +92,8 @@ export function RaceDetail() {
             <table className="table">
               <thead>
                 <tr>
-                  <th style={{ width: 110 }}>Start</th>
+                  <th style={{ width: 140 }}>Start</th>
+                  <th style={{ width: 140 }}>Meet</th>
                   <th>Client</th>
                   <th>Division</th>
                   <th>Package</th>
@@ -116,6 +119,22 @@ export function RaceDetail() {
                         <strong>{b.startTime || 'TBC'}</strong>
                       </span>
                       {b.wave ? <div className="muted small">Wave {b.wave}</div> : null}
+                    </td>
+                    <td>
+                      <input
+                        className="time-input no-print"
+                        type="time"
+                        defaultValue={b.meetTime ?? ''}
+                        key={`m${b.meetTime}`}
+                        aria-label={`Meet time for ${b.clientName}`}
+                        onBlur={(e) => e.target.value !== (b.meetTime ?? '') && updateInline(b, { meetTime: e.target.value })}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                      />
+                      <span className="print-only">
+                        <strong>{meetTimeFor(b, settings).time || 'TBC'}</strong>
+                      </span>
+                      {!b.meetTime && meetTimeFor(b, settings).time ? <div className="muted small no-print">auto {meetTimeFor(b, settings).time}</div> : null}
+                      {b.meetPoint ? <div className="muted small">{b.meetPoint}</div> : null}
                     </td>
                     <td>
                       <button className="link-strong" onClick={() => openEditor({ id: b.id })}>
@@ -189,6 +208,9 @@ export function RaceDetail() {
             <button className="btn no-print" onClick={syncRace} disabled={syncing} title={connected ? '' : 'Connect Google to sync'}>
               {syncing ? 'Syncing…' : unsynced ? `Sync ${unsynced} to calendar` : 'Calendar ✓'}
             </button>
+            <button className="btn no-print" onClick={() => openComposer({ eventId: ev.id, templateId: missingTimes ? 'start-times-out' : undefined })} disabled={!active.length}>
+              Message clients
+            </button>
             <button className="btn btn-primary no-print" onClick={() => openEditor({ eventId: ev.id })}>
               + Add client
             </button>
@@ -218,7 +240,7 @@ export function RaceDetail() {
         </div>
       </div>
 
-      {missingTimes > 0 ? <p className="hint-bar no-print">Start waves out? Type each time straight into the Start column. It saves when you leave the box and updates Google Calendar.</p> : null}
+      {missingTimes > 0 ? <p className="hint-bar no-print">Start waves out? Use “Message clients” to ask everyone without a start time for theirs, then type each time into the Start column. It saves when you leave the box and updates Google Calendar. Meet time fills in automatically ({settings.calendarLeadMin} min before) unless you set one.</p> : null}
 
       {bookings.length === 0 ? (
         <section className="card">

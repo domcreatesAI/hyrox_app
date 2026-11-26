@@ -10,7 +10,8 @@ import { COMMON_TIME_ZONES, money } from '../lib/format';
 import { disconnectGoogle, getAccessToken } from '../lib/google';
 import { useBookings, useEvents, useGoogleConnected, useSettings } from '../lib/hooks';
 import { uid } from '../lib/id';
-import type { Package, Settings as S } from '../types';
+import { AUDIENCES, DEFAULT_TEMPLATES, PLACEHOLDERS } from '../lib/templates';
+import type { Audience, MessageTemplate, Package, Settings as S } from '../types';
 
 export function Settings() {
   const settings = useSettings();
@@ -121,6 +122,8 @@ export function Settings() {
         </div>
       </section>
 
+      <TemplatesEditor templates={settings.templates} onChange={(templates) => patch({ templates })} />
+
       <section className="card">
         <h2 className="card-title">Business defaults</h2>
         <div className="grid grid-3">
@@ -204,11 +207,11 @@ export function Settings() {
                 ))}
             </select>
           </Field>
-          <Field label="Start the entry this early" hint="Minutes before their start time, for warm-up shots">
+          <Field label="Default meet time" hint="Minutes before their start time, unless a booking has its own meet time">
             <input type="number" min={0} step={5} defaultValue={settings.calendarLeadMin} key={`l${settings.calendarLeadMin}`} onBlur={(e) => patch({ calendarLeadMin: Number(e.target.value) })} />
           </Field>
-          <Field label="Entry length (minutes)" hint="Total block, including the warm-up lead">
-            <input type="number" min={15} step={15} defaultValue={settings.calendarDurationMin} key={`d${settings.calendarDurationMin}`} onBlur={(e) => patch({ calendarDurationMin: Number(e.target.value) })} />
+          <Field label="Coverage after start (minutes)" hint="The calendar entry runs from meet time until this long after their start">
+            <input type="number" min={15} step={15} defaultValue={settings.coverageAfterStartMin} key={`d${settings.coverageAfterStartMin}`} onBlur={(e) => patch({ coverageAfterStartMin: Number(e.target.value) })} />
           </Field>
         </div>
         <label className="check">
@@ -290,5 +293,79 @@ export function Settings() {
         <p className="muted small">Restoring merges the backup with what’s here. Where both have the same booking, the most recently edited copy is kept.</p>
       </section>
     </>
+  );
+}
+
+function TemplatesEditor({ templates, onChange }: { templates: MessageTemplate[]; onChange: (t: MessageTemplate[]) => void }) {
+  const refs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const update = (id: string, p: Partial<MessageTemplate>) => onChange(templates.map((t) => (t.id === id ? { ...t, ...p } : t)));
+  const insert = (t: MessageTemplate, key: string) => {
+    const el = refs.current[t.id];
+    const token = `{${key}}`;
+    if (!el) return update(t.id, { body: t.body + token });
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const body = el.value.slice(0, start) + token + el.value.slice(end);
+    update(t.id, { body });
+    // The textarea remounts with the new text, so look it up again before restoring the cursor.
+    requestAnimationFrame(() => {
+      const node = refs.current[t.id];
+      node?.focus();
+      node?.setSelectionRange(start + token.length, start + token.length);
+    });
+  };
+  const missingDefaults = DEFAULT_TEMPLATES.filter((d) => !templates.some((t) => t.id === d.id));
+
+  return (
+    <section className="card">
+      <h2 className="card-title">Message templates</h2>
+      <p className="muted">
+        Click a <code>{'{placeholder}'}</code> to insert it at the cursor; it’s filled in from the booking. Wrap a part in <code>[[ ]]</code> to leave it out when a detail inside is empty, e.g. <code>[[ by {'{meet_point}'}]]</code>.
+      </p>
+      {templates.map((t) => (
+        <div key={t.id} className="template-edit">
+          <div className="template-edit-head">
+            <input defaultValue={t.name} key={`n${t.name}`} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && update(t.id, { name: e.target.value.trim() })} aria-label="Template name" />
+            <select value={t.audience} onChange={(e) => update(t.id, { audience: e.target.value as Audience })} aria-label="Usually sent to" title="Pre-selects these clients when messaging a whole race">
+              {AUDIENCES.map((a) => (
+                <option key={a.id} value={a.id}>
+                  For: {a.label}
+                </option>
+              ))}
+            </select>
+            <button className="link danger" onClick={() => confirm(`Delete “${t.name}”?`) && onChange(templates.filter((x) => x.id !== t.id))}>
+              Delete
+            </button>
+          </div>
+          <textarea
+            ref={(el) => {
+              refs.current[t.id] = el;
+            }}
+            rows={4}
+            defaultValue={t.body}
+            key={`b${t.body}`}
+            onBlur={(e) => e.target.value !== t.body && update(t.id, { body: e.target.value })}
+            aria-label={`${t.name} text`}
+          />
+          <div className="placeholder-chips">
+            {PLACEHOLDERS.map((p) => (
+              <button key={p.key} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(t, p.key)} title={`Insert ${p.label}`}>
+                {`{${p.key}}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="row spaced">
+        <button className="btn" onClick={() => onChange([...templates, { id: uid(), name: 'New template', audience: 'all', body: 'Hey {first_name}, ' }])}>
+          + Template
+        </button>
+        {missingDefaults.length ? (
+          <button className="btn" onClick={() => onChange([...templates, ...missingDefaults])}>
+            Restore {missingDefaults.length} default template{missingDefaults.length === 1 ? '' : 's'}
+          </button>
+        ) : null}
+      </div>
+    </section>
   );
 }

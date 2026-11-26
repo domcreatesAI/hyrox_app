@@ -39,6 +39,30 @@ export function balanceDue(b: Booking): number {
   return Math.max(0, b.price - (b.depositPaid ? b.depositAmount : 0));
 }
 
+/** Minutes since midnight for HH:mm. */
+const toMin = (t: string) => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+};
+
+/**
+ * The meet time for a booking: the one set on the booking, otherwise the default
+ * lead before the start time. Empty when neither a meet time nor a start time is known.
+ */
+export function meetTimeFor(b: Booking, s: Settings): { time: string; isDefault: boolean } {
+  if (b.meetTime) return { time: b.meetTime, isDefault: false };
+  if (!b.startTime) return { time: '', isDefault: true };
+  return { time: addMinutesLocal('2000-01-01', b.startTime, -s.calendarLeadMin).slice(11, 16), isDefault: true };
+}
+
+/** Minutes from meet time to start time (meet is assumed to be before start, within 12h). */
+function meetLeadMinutes(b: Booking, s: Settings): number {
+  if (!b.meetTime || !b.startTime) return s.calendarLeadMin;
+  let diff = toMin(b.startTime) - toMin(b.meetTime);
+  if (diff < 0) diff += 24 * 60;
+  return diff > 12 * 60 ? s.calendarLeadMin : diff;
+}
+
 export function buildDescription(b: Booking, ev: RaceEvent | undefined, s: Settings): string {
   const c = s.currency;
   const lines: string[] = [];
@@ -46,6 +70,8 @@ export function buildDescription(b: Booking, ev: RaceEvent | undefined, s: Setti
   if (ev) lines.push(`🏁 ${ev.name}${ev.location ? ` · ${ev.location}` : ''}`);
   const raceBits = [b.division, b.wave && `Wave ${b.wave}`, b.startTime ? `Start ${b.startTime}` : 'Start time TBC'].filter(Boolean);
   lines.push(`⏱ ${raceBits.join(' · ')}${ev?.timeZone ? ` (${ev.timeZone})` : ''}`);
+  const meet = meetTimeFor(b, s);
+  if (meet.time || b.meetPoint) lines.push(`🤝 Meet ${meet.time || 'time TBC'}${b.meetPoint ? ` · ${b.meetPoint}` : ''}`);
   lines.push('');
   lines.push(`📦 ${packageLabel(b, s.packages)} — ${money(b.price, c)}`);
   lines.push(
@@ -90,19 +116,26 @@ export function buildEventBody(b: Booking, ev: RaceEvent | undefined, s: Setting
   const flag = b.depositPaid ? '' : '⚠️ ';
   const summary = `${flag}🎥 ${b.startTime ? `${b.startTime} ` : ''}${who}${pkg ? ` — ${pkg}` : ''}${b.startTime ? '' : ' · start TBC'}`;
 
+  // The entry runs from meet time until the coverage window after the start ends.
+  const lead = meetLeadMinutes(b, s);
   const timing = b.startTime
     ? {
-        start: { dateTime: addMinutesLocal(b.raceDate, b.startTime, -s.calendarLeadMin), timeZone: tz },
-        end: { dateTime: addMinutesLocal(b.raceDate, b.startTime, s.calendarDurationMin - s.calendarLeadMin), timeZone: tz }
+        start: { dateTime: addMinutesLocal(b.raceDate, b.startTime, -lead), timeZone: tz },
+        end: { dateTime: addMinutesLocal(b.raceDate, b.startTime, s.coverageAfterStartMin), timeZone: tz }
       }
-    : { start: { date: b.raceDate }, end: { date: addDays(b.raceDate, 1) } };
+    : b.meetTime
+      ? {
+          start: { dateTime: addMinutesLocal(b.raceDate, b.meetTime, 0), timeZone: tz },
+          end: { dateTime: addMinutesLocal(b.raceDate, b.meetTime, s.calendarLeadMin + s.coverageAfterStartMin), timeZone: tz }
+        }
+      : { start: { date: b.raceDate }, end: { date: addDays(b.raceDate, 1) } };
 
   return {
     summary,
     description: buildDescription(b, ev, s),
     location: ev?.location || undefined,
     colorId: colourFor(b),
-    transparency: b.startTime ? 'opaque' : 'transparent',
+    transparency: b.startTime || b.meetTime ? 'opaque' : 'transparent',
     ...timing,
     extendedProperties: { private: { raceDayCrmBookingId: b.id } }
   };

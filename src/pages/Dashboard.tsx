@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useBookingEditor } from '../components/BookingEditor';
 import { Badge, Empty, PageHeader } from '../components/ui';
-import { balanceDue, packageLabel } from '../lib/calendar';
+import { balanceDue, meetTimeFor, packageLabel } from '../lib/calendar';
 import { needsCalendarSync } from '../lib/data';
 import { daysBetween, formatDate, formatDateRange, money, relativeDay, todayISO, plural } from '../lib/format';
 import { useBookings, useEvents, useGoogleConnected, useSettings } from '../lib/hooks';
@@ -146,6 +146,7 @@ export function Dashboard() {
               <thead>
                 <tr>
                   <th>Date</th>
+                  <th>Meet</th>
                   <th>Start</th>
                   <th>Client</th>
                   <th>Package</th>
@@ -156,6 +157,7 @@ export function Dashboard() {
                 {upcoming.slice(0, 10).map((b) => (
                   <tr key={b.id} className="clickable" onClick={() => openEditor({ id: b.id })}>
                     <td>{formatDate(b.raceDate)}</td>
+                    <td>{meetTimeFor(b, settings).time || <span className="muted">TBC</span>}</td>
                     <td>{b.startTime || <span className="muted">TBC</span>}</td>
                     <td>
                       <strong>{b.clientName}</strong>

@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { Booking, RaceEvent, Settings } from './types';
+import { DEFAULT_TEMPLATES } from './lib/templates';
 
 interface SettingsRow extends Settings {
   key: 'settings';
@@ -27,12 +28,13 @@ export const DEFAULT_SETTINGS: Settings = {
   currency: 'GBP',
   defaultDeposit: 50,
   defaultTimeZone: 'Europe/London',
-  calendarDurationMin: 120,
-  calendarLeadMin: 30,
+  calendarLeadMin: 45,
+  coverageAfterStartMin: 120,
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
   calendarId: 'primary',
   autoSyncCalendar: true,
   updatedAt: 0,
+  templates: DEFAULT_TEMPLATES,
   packages: [
     {
       id: 'race-photos',

@@ -69,6 +69,10 @@ export interface Booking extends SyncMeta {
   raceDate: string; // YYYY-MM-DD
   /** Start wave time (HH:mm), empty until the race publishes start times. */
   startTime: string;
+  /** When Dom meets the client (HH:mm). Empty = default lead before start time. */
+  meetTime: string;
+  /** Where to meet, e.g. "Warm-up area, Hall 3". */
+  meetPoint: string;
   wave: string;
   division: string;
 
@@ -89,6 +93,18 @@ export interface Booking extends SyncMeta {
 
   calendarEventId?: string;
   calendarSyncedAt?: number;
+  /** Messages copied/sent from the app, newest last. */
+  messageLog?: { templateId: string; templateName: string; at: number }[];
+}
+
+export type Audience = 'all' | 'enquiry' | 'no-deposit' | 'no-start' | 'no-music' | 'balance-due';
+
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  body: string;
+  /** Which clients this is usually sent to; pre-selects them when messaging a whole race. */
+  audience: Audience;
 }
 
 export interface Settings {
@@ -96,14 +112,15 @@ export interface Settings {
   currency: string;
   defaultDeposit: number;
   defaultTimeZone: string;
-  /** Length of the calendar block for each client, in minutes. */
-  calendarDurationMin: number;
-  /** Minutes before start time the calendar block begins (warm-up coverage). */
+  /** Default meet time: this many minutes before the client's start time. */
   calendarLeadMin: number;
+  /** How long the calendar entry runs after the start time, in minutes. */
+  coverageAfterStartMin: number;
   googleClientId: string;
   calendarId: string;
   autoSyncCalendar: boolean;
   packages: Package[];
+  templates: MessageTemplate[];
   /** Last successful Drive sync (ms). */
   lastDriveSync?: number;
   /** Bumped whenever settings change, used to merge settings across devices. */

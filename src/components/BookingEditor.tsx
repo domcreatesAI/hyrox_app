@@ -3,10 +3,11 @@ import { db } from '../db';
 import { deleteBooking, newBooking, saveBooking } from '../lib/data';
 import { addDays, daysBetween, formatDate, money, normaliseHandle, todayISO } from '../lib/format';
 import { useEvents, useSettings } from '../lib/hooks';
-import { balanceDue } from '../lib/calendar';
+import { balanceDue, meetTimeFor } from '../lib/calendar';
 import { DIVISIONS, STATUSES, type Booking, type Settings } from '../types';
 import { Field } from './ui';
 import { useToast } from './Toast';
+import { useMessageComposer } from './MessageComposer';
 
 type OpenArgs = { id: string } | { eventId?: string; raceDate?: string };
 const EditorCtx = createContext<(args: OpenArgs) => void>(() => {});
@@ -23,7 +24,9 @@ export function BookingEditorProvider({ children }: { children: ReactNode }) {
         const b = await db.bookings.get(args.id);
         if (b) {
           setIsNew(false);
-          setDraft(structuredClone(b));
+          // Older records may predate newer fields.
+          const copy = structuredClone(b);
+          setDraft({ ...copy, meetTime: copy.meetTime ?? '', meetPoint: copy.meetPoint ?? '' });
         }
       } else {
         let raceDate = args.raceDate;
@@ -51,6 +54,7 @@ function computePrice(s: Settings, packageId: string, addOnIds: string[]) {
 function BookingDrawer({ initial, isNew, settings, onClose }: { initial: Booking; isNew: boolean; settings: Settings; onClose: () => void }) {
   const events = useEvents();
   const toast = useToast();
+  const openComposer = useMessageComposer();
   const [b, setB] = useState<Booking>(initial);
   const [saving, setSaving] = useState(false);
   const set = <K extends keyof Booking>(k: K, v: Booking[K]) => setB((x) => ({ ...x, [k]: v }));
@@ -166,6 +170,29 @@ function BookingDrawer({ initial, isNew, settings, onClose }: { initial: Booking
               <Field label="Start time" hint={b.startTime ? (ev ? `Local time · ${ev.timeZone}` : undefined) : 'Leave empty until start waves are out'}>
                 <input type="time" value={b.startTime} onChange={(e) => set('startTime', e.target.value)} />
               </Field>
+              <Field
+                label="Meet time"
+                hint={
+                  b.meetTime ? (
+                    b.startTime && b.meetTime > b.startTime ? (
+                      <span className="warn-text">That’s after their start time</span>
+                    ) : (
+                      <button type="button" className="link" onClick={() => set('meetTime', '')}>
+                        Use default ({settings.calendarLeadMin} min before start)
+                      </button>
+                    )
+                  ) : b.startTime ? (
+                    `Default: ${meetTimeFor(b, settings).time} (${settings.calendarLeadMin} min before start)`
+                  ) : (
+                    `Defaults to ${settings.calendarLeadMin} min before start`
+                  )
+                }
+              >
+                <input type="time" value={b.meetTime} onChange={(e) => set('meetTime', e.target.value)} />
+              </Field>
+              <Field label="Meet point">
+                <input value={b.meetPoint} onChange={(e) => set('meetPoint', e.target.value)} placeholder="e.g. Warm-up area, Hall 3" />
+              </Field>
               <Field label="Division">
                 <select value={b.division} onChange={(e) => set('division', e.target.value)}>
                   {DIVISIONS.map((d) => (
@@ -264,6 +291,19 @@ function BookingDrawer({ initial, isNew, settings, onClose }: { initial: Booking
             </div>
           </section>
 
+          {b.messageLog?.length ? (
+            <section className="form-section">
+              <h3>Messages sent</h3>
+              <ul className="msg-log">
+                {[...b.messageLog].reverse().slice(0, 6).map((m) => (
+                  <li key={m.at}>
+                    {m.templateName} <span className="muted">· {new Date(m.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <section className="form-section">
             <h3>Notes &amp; status</h3>
             <div className="grid">
@@ -292,6 +332,9 @@ function BookingDrawer({ initial, isNew, settings, onClose }: { initial: Booking
             <span />
           )}
           <div className="row">
+            <button type="button" className="btn" onClick={() => openComposer({ booking: b })} disabled={!b.clientName.trim()}>
+              Message…
+            </button>
             <button type="button" className="btn" onClick={onClose}>
               Cancel
             </button>

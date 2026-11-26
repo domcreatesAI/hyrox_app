@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { BookingEditorProvider, useBookingEditor } from './components/BookingEditor';
+import { MessageComposerProvider } from './components/MessageComposer';
 import { ToastProvider } from './components/Toast';
 import { getSettings } from './db';
 import { syncWithDrive } from './lib/drive';
@@ -104,9 +105,11 @@ export default function App() {
   return (
     <HashRouter>
       <ToastProvider>
-        <BookingEditorProvider>
-          <Shell />
-        </BookingEditorProvider>
+        <MessageComposerProvider>
+          <BookingEditorProvider>
+            <Shell />
+          </BookingEditorProvider>
+        </MessageComposerProvider>
       </ToastProvider>
     </HashRouter>
   );
